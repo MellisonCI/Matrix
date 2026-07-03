@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { supabase, CapabilityCategory, ProductCategory } from '@/lib/supabase'
@@ -9,6 +9,14 @@ import { slugify } from '@/lib/slug'
 import { Settings } from 'lucide-react'
 
 export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <HomePageContent />
+    </Suspense>
+  )
+}
+
+function HomePageContent() {
   const [capCategories, setCapCategories] = useState<CapabilityCategory[]>([])
   const [prodCategories, setProdCategories] = useState<ProductCategory[]>([])
   const [loading, setLoading] = useState(true)

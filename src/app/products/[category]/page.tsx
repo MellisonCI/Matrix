@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
 import {
@@ -21,6 +21,14 @@ import { downloadCsv } from '@/lib/csv'
 import { ArrowLeft, Pencil, Download } from 'lucide-react'
 
 export default function ProductCategoryPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <ProductCategoryPageContent />
+    </Suspense>
+  )
+}
+
+function ProductCategoryPageContent() {
   const { category: categorySlug } = useParams() as { category: string }
   const searchParams = useSearchParams()
   const quarterParam = searchParams.get('quarter')

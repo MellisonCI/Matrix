@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
 import {
@@ -19,6 +19,14 @@ import { CategoryNav } from '@/components/CategoryNav'
 import { ArrowLeft, Eye } from 'lucide-react'
 
 export default function CapabilityCategoryEditPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <CapabilityCategoryEditPageContent />
+    </Suspense>
+  )
+}
+
+function CapabilityCategoryEditPageContent() {
   const { category: categorySlug } = useParams() as { category: string }
   const searchParams = useSearchParams()
   const quarterParam = searchParams.get('quarter')
