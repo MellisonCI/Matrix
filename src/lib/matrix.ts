@@ -65,16 +65,32 @@ export interface ValueLike {
   detail: string | null
 }
 
-/** Computes a per-row summary: "% present" for boolean features, average for numeric. */
-export function computeRowSummary(valueType: ValueType, values: ValueLike[], unitLabel: string | null): string {
-  const applicable = values.filter(v => !v.is_not_applicable)
+/**
+ * Computes a per-row summary: "% present" for boolean features, average for numeric.
+ *
+ * A blank cell (no stored value row at all) means "not present," not "no data" --
+ * only an explicit is_not_applicable row should be excluded from the denominator.
+ * So this takes the full list of column keys (all firms/products), not just the
+ * keys that happen to have a stored row, otherwise every boolean feature comes out
+ * as 100% (every firm that HAS a row is, by construction, a present one).
+ */
+export function computeRowSummary(
+  valueType: ValueType,
+  columnKeys: string[],
+  valuesByColumnKey: Map<string, ValueLike | undefined>,
+  unitLabel: string | null
+): string {
+  const entries = columnKeys.map(key => valuesByColumnKey.get(key))
+  const applicable = entries.filter(v => !(v && v.is_not_applicable))
   if (valueType === 'boolean') {
     if (applicable.length === 0) return '—'
-    const present = applicable.filter(v => v.is_present).length
+    const present = applicable.filter(v => v && v.is_present).length
     return `${Math.round((present / applicable.length) * 100)}%`
   }
   if (valueType === 'numeric') {
-    const nums = applicable.map(v => v.numeric_value).filter((n): n is number => n !== null)
+    const nums = applicable
+      .map(v => v?.numeric_value)
+      .filter((n): n is number => n !== null && n !== undefined)
     if (nums.length === 0) return '—'
     const avg = nums.reduce((a, b) => a + b, 0) / nums.length
     const rounded = Math.round(avg * 100) / 100

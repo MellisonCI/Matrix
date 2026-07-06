@@ -110,7 +110,7 @@ function SectionRows({ section, columns, showSummary }: { section: PivotSection;
           </td>
           {showSummary && (
             <td className="border-b border-slate-100 px-2 py-2 text-center text-xs text-slate-500">
-              {computeRowSummary(row.valueType, [...row.values.values()].filter((v): v is ValueLike => !!v), row.unitLabel)}
+              {computeRowSummary(row.valueType, columns.map(c => c.key), row.values, row.unitLabel)}
             </td>
           )}
           {columns.map(col => (
