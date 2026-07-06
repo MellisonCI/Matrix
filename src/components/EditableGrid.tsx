@@ -148,23 +148,34 @@ function Cell({
   // All hooks called unconditionally (Rules of Hooks) even though only one
   // branch's state is actually used for a given row.valueType -- that type
   // is fixed for the lifetime of this cell, so no state ever goes stale.
+  //
+  // Every editable value keeps its own local draft state, initialized from
+  // the fetched `value` prop but never re-synced from it afterward. That prop
+  // stays frozen at whatever was fetched on page load (committing a change
+  // doesn't update the parent's fetched list), so a control whose displayed
+  // value is derived directly from `value` snaps back the instant you change
+  // it -- this bit the boolean dropdown specifically because it had no local
+  // state of its own (unlike the numeric/text inputs below).
+  const [presence, setPresence] = useState<'' | 'yes' | 'na'>(
+    value?.is_not_applicable ? 'na' : value?.is_present ? 'yes' : ''
+  )
   const [detail, setDetail] = useState(value?.detail || '')
   const [num, setNum] = useState<number | null>(value?.numeric_value ?? null)
   const [text, setText] = useState<string>(value?.raw_text ?? '')
 
   if (row.valueType === 'boolean') {
-    const selectValue = value?.is_not_applicable ? 'na' : value?.is_present ? 'yes' : ''
     return (
       <div className="flex flex-col items-center gap-1">
         <div className="flex items-center gap-1">
           <select
-            value={selectValue}
+            value={presence}
             onChange={e => {
-              const v = e.target.value
+              const v = e.target.value as '' | 'yes' | 'na'
+              setPresence(v)
               onCommit({
                 is_present: v === 'yes' ? true : v === '' ? null : false,
                 is_not_applicable: v === 'na',
-                raw_text: v === 'yes' ? '•' : v === 'na' ? 'N/A' : null,
+                raw_text: v === 'yes' ? (detail ? `• (${detail})` : '•') : v === 'na' ? 'N/A' : null,
               })
             }}
             className="text-xs border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-slate-400"
@@ -175,7 +186,7 @@ function Cell({
           </select>
           <StatusIcon status={status} />
         </div>
-        {selectValue === 'yes' && (
+        {presence === 'yes' && (
           <input
             type="text"
             placeholder="detail"
