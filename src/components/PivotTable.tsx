@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ValueType } from '@/lib/supabase'
 import { ValueLike, computeRowSummary } from '@/lib/matrix'
 
@@ -90,17 +92,28 @@ export function PivotTable({
 }
 
 function SectionRows({ section, columns, showSummary }: { section: PivotSection; columns: PivotColumn[]; showSummary: boolean }) {
+  const [expanded, setExpanded] = useState(true)
+
   return (
     <>
       <tr>
         <td
           colSpan={columns.length + 1 + (showSummary ? 1 : 0)}
-          className="sticky left-0 bg-slate-100 border-b border-slate-200 px-3 py-1.5 font-medium text-slate-700 text-xs uppercase tracking-wide"
+          className="bg-slate-100 border-b border-slate-200 py-1.5 cursor-pointer select-none"
+          onClick={() => setExpanded(e => !e)}
         >
-          {section.name}
+          {/* `position: sticky` on a colSpan <td> doesn't reliably stick with
+              border-collapse -- sticking a plain inner div instead avoids
+              that table-specific quirk while keeping the row's background
+              spanning the full scrollable width. */}
+          <div className="sticky left-3 z-10 w-fit flex items-center gap-1.5 font-medium text-slate-700 text-xs uppercase tracking-wide">
+            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {section.name}
+            <span className="text-slate-400 normal-case font-normal">({section.rows.length})</span>
+          </div>
         </td>
       </tr>
-      {section.rows.map(row => (
+      {expanded && section.rows.map(row => (
         <tr key={row.featureId} className="hover:bg-slate-50">
           <td
             className="sticky left-0 bg-white border-b border-r border-slate-100 px-3 py-2 text-slate-700"

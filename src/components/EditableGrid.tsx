@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ValueType } from '@/lib/supabase'
 import { ValueLike } from '@/lib/matrix'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 import { PivotColumn } from './PivotTable'
 
 export interface EditableRow {
@@ -91,17 +91,26 @@ function SectionRows({
   status: Record<string, CellStatus>
   onCommit: (featureId: string, columnKey: string, next: Partial<ValueLike>) => void
 }) {
+  const [expanded, setExpanded] = useState(true)
+
   return (
     <>
       <tr>
         <td
           colSpan={columns.length + 1}
-          className="sticky left-0 bg-slate-100 border-b border-slate-200 px-3 py-1.5 font-medium text-slate-700 text-xs uppercase tracking-wide"
+          className="bg-slate-100 border-b border-slate-200 py-1.5 cursor-pointer select-none"
+          onClick={() => setExpanded(e => !e)}
         >
-          {section.name}
+          {/* see PivotTable.tsx: sticky doesn't reliably work on a colSpan
+              <td> with border-collapse, so the inner div sticks instead. */}
+          <div className="sticky left-3 z-10 w-fit flex items-center gap-1.5 font-medium text-slate-700 text-xs uppercase tracking-wide">
+            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {section.name}
+            <span className="text-slate-400 normal-case font-normal">({section.rows.length})</span>
+          </div>
         </td>
       </tr>
-      {section.rows.map(row => (
+      {expanded && section.rows.map(row => (
         <tr key={row.featureId} className="hover:bg-slate-50">
           <td
             className="sticky left-0 bg-white border-b border-r border-slate-100 px-3 py-2 text-slate-700"
