@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase, Firm, Product, CapabilityValue, ProductValue, Quarter, ValueType } from '@/lib/supabase'
 import { fetchAllRows } from '@/lib/fetchAll'
+import { DiffableValue, formatCellValue } from '@/lib/diff'
 
 interface ChangeRow {
   subjectName: string
@@ -11,24 +12,7 @@ interface ChangeRow {
   after: string
 }
 
-interface ValueBase {
-  feature_id: string
-  raw_text: string | null
-  is_present: boolean | null
-  is_not_applicable: boolean
-  numeric_value: number | null
-  detail: string | null
-}
-
-function formatCellValue(v: ValueBase | undefined, valueType: ValueType): string {
-  if (!v) return '—'
-  if (v.is_not_applicable) return 'N/A'
-  if (valueType === 'boolean') return v.is_present ? (v.detail ? `Yes (${v.detail})` : 'Yes') : 'No'
-  if (valueType === 'numeric') return v.numeric_value != null ? String(v.numeric_value) : '—'
-  return v.raw_text || '—'
-}
-
-function diffValues<V extends ValueBase>(
+function diffValues<V extends DiffableValue>(
   current: V[],
   previous: V[],
   getSubjectId: (v: V) => string,

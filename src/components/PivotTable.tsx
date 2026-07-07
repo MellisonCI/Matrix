@@ -52,10 +52,12 @@ export function PivotTable({
   sections,
   columns,
   showSummary = true,
+  changedKeys,
 }: {
   sections: PivotSection[]
   columns: PivotColumn[]
   showSummary?: boolean
+  changedKeys?: Set<string>
 }) {
   return (
     <div className="overflow-auto border border-slate-200 rounded-xl bg-white">
@@ -83,7 +85,13 @@ export function PivotTable({
         </thead>
         <tbody>
           {sections.map(section => (
-            <SectionRows key={section.name} section={section} columns={columns} showSummary={showSummary} />
+            <SectionRows
+              key={section.name}
+              section={section}
+              columns={columns}
+              showSummary={showSummary}
+              changedKeys={changedKeys}
+            />
           ))}
         </tbody>
       </table>
@@ -91,7 +99,17 @@ export function PivotTable({
   )
 }
 
-function SectionRows({ section, columns, showSummary }: { section: PivotSection; columns: PivotColumn[]; showSummary: boolean }) {
+function SectionRows({
+  section,
+  columns,
+  showSummary,
+  changedKeys,
+}: {
+  section: PivotSection
+  columns: PivotColumn[]
+  showSummary: boolean
+  changedKeys?: Set<string>
+}) {
   const [expanded, setExpanded] = useState(true)
 
   return (
@@ -126,11 +144,18 @@ function SectionRows({ section, columns, showSummary }: { section: PivotSection;
               {computeRowSummary(row.valueType, columns.map(c => c.key), row.values, row.unitLabel)}
             </td>
           )}
-          {columns.map(col => (
-            <td key={col.key} className="border-b border-slate-100 px-2 py-2 text-center">
-              <CellContent value={row.values.get(col.key)} valueType={row.valueType} />
-            </td>
-          ))}
+          {columns.map(col => {
+            const changed = changedKeys?.has(`${row.featureId}::${col.key}`)
+            return (
+              <td
+                key={col.key}
+                className={`relative border-b border-slate-100 px-2 py-2 text-center ${changed ? 'bg-amber-50' : ''}`}
+              >
+                {changed && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                <CellContent value={row.values.get(col.key)} valueType={row.valueType} />
+              </td>
+            )
+          })}
         </tr>
       ))}
     </>

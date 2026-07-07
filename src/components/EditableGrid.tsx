@@ -26,10 +26,12 @@ export function EditableGrid({
   sections,
   columns,
   onCellCommit,
+  changedKeys,
 }: {
   sections: EditableSection[]
   columns: PivotColumn[]
   onCellCommit: (featureId: string, columnKey: string, next: Partial<ValueLike>) => Promise<void>
+  changedKeys?: Set<string>
 }) {
   const [status, setStatus] = useState<Record<string, CellStatus>>({})
 
@@ -72,6 +74,7 @@ export function EditableGrid({
               columns={columns}
               status={status}
               onCommit={commit}
+              changedKeys={changedKeys}
             />
           ))}
         </tbody>
@@ -85,11 +88,13 @@ function SectionRows({
   columns,
   status,
   onCommit,
+  changedKeys,
 }: {
   section: EditableSection
   columns: PivotColumn[]
   status: Record<string, CellStatus>
   onCommit: (featureId: string, columnKey: string, next: Partial<ValueLike>) => void
+  changedKeys?: Set<string>
 }) {
   const [expanded, setExpanded] = useState(true)
 
@@ -118,17 +123,24 @@ function SectionRows({
           >
             {row.name}
           </td>
-          {columns.map(col => (
-            <td key={col.key} className="border-b border-slate-100 px-2 py-1.5 text-center align-top">
-              <Cell
-                row={row}
-                columnKey={col.key}
-                value={row.values.get(col.key)}
-                status={status[`${row.featureId}:${col.key}`] || 'idle'}
-                onCommit={next => onCommit(row.featureId, col.key, next)}
-              />
-            </td>
-          ))}
+          {columns.map(col => {
+            const changed = changedKeys?.has(`${row.featureId}::${col.key}`)
+            return (
+              <td
+                key={col.key}
+                className={`relative border-b border-slate-100 px-2 py-1.5 text-center align-top ${changed ? 'bg-amber-50' : ''}`}
+              >
+                {changed && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                <Cell
+                  row={row}
+                  columnKey={col.key}
+                  value={row.values.get(col.key)}
+                  status={status[`${row.featureId}:${col.key}`] || 'idle'}
+                  onCommit={next => onCommit(row.featureId, col.key, next)}
+                />
+              </td>
+            )
+          })}
         </tr>
       ))}
     </>

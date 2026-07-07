@@ -19,6 +19,7 @@ import { CategoryNav } from '@/components/CategoryNav'
 import { MultiSelectFilter, makeSetToggler } from '@/components/MultiSelectFilter'
 import { TopNav } from '@/components/TopNav'
 import { fetchAllRows } from '@/lib/fetchAll'
+import { computeChangedKeys } from '@/lib/diff'
 import { ArrowLeft, Eye } from 'lucide-react'
 
 export default function CapabilityCategoryEditPage() {
@@ -35,6 +36,9 @@ function CapabilityCategoryEditPageContent() {
   const quarterParam = searchParams.get('quarter')
   const { quarters } = useQuarters()
   const quarterId = quarterParam || quarters.find(q => q.is_current)?.id || quarters[0]?.id
+  // quarters come back most-recent-first, so the previous quarter is the next entry
+  const quarterIndex = quarters.findIndex(q => q.id === quarterId)
+  const previousQuarter = quarterIndex >= 0 && quarterIndex + 1 < quarters.length ? quarters[quarterIndex + 1] : null
 
   const [allCategories, setAllCategories] = useState<CapabilityCategory[]>([])
   const [category, setCategory] = useState<CapabilityCategory | null>(null)
@@ -43,6 +47,7 @@ function CapabilityCategoryEditPageContent() {
   const [features, setFeatures] = useState<CapabilityFeature[]>([])
   const [firms, setFirms] = useState<Firm[]>([])
   const [values, setValues] = useState<CapabilityValue[]>([])
+  const [previousValues, setPreviousValues] = useState<CapabilityValue[]>([])
   const [filter, setFilter] = useState('')
   const [selectedFirmIds, setSelectedFirmIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -84,27 +89,33 @@ function CapabilityCategoryEditPageContent() {
         setFeatures(feats || [])
 
         if (feats && feats.length > 0 && quarterId) {
-          const vals = await fetchAllRows<CapabilityValue>((from, to) =>
-            supabase
-              .from('capability_values')
-              .select('*')
-              .in('feature_id', feats.map(f => f.id))
-              .eq('quarter_id', quarterId)
-              .range(from, to)
-          )
+          const featureIds = feats.map(f => f.id)
+          const [vals, prevVals] = await Promise.all([
+            fetchAllRows<CapabilityValue>((from, to) =>
+              supabase.from('capability_values').select('*').in('feature_id', featureIds).eq('quarter_id', quarterId).range(from, to)
+            ),
+            previousQuarter
+              ? fetchAllRows<CapabilityValue>((from, to) =>
+                  supabase.from('capability_values').select('*').in('feature_id', featureIds).eq('quarter_id', previousQuarter.id).range(from, to)
+                )
+              : Promise.resolve([]),
+          ])
           setValues(vals)
+          setPreviousValues(prevVals)
         } else {
           setValues([])
+          setPreviousValues([])
         }
       } else {
         setFeatures([])
         setValues([])
+        setPreviousValues([])
       }
       setLoading(false)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [[...selectedCategoryIds].sort().join(','), quarterId])
+  }, [[...selectedCategoryIds].sort().join(','), quarterId, previousQuarter?.id])
 
   const categoryNameBySubcategory = useMemo(() => {
     const m = new Map<string, string>()
@@ -145,6 +156,12 @@ function CapabilityCategoryEditPageContent() {
       return { name, rows }
     }).filter(s => s.rows.length > 0)
   }, [subcategories, features, values, filter, categoryNameBySubcategory, showCategoryPrefix])
+
+  const changedKeys = useMemo(() => {
+    if (!previousQuarter || previousValues.length === 0) return undefined
+    const featuresById = new Map(features.map(f => [f.id, f]))
+    return computeChangedKeys(values, previousValues, v => v.firm_id, featuresById)
+  }, [values, previousValues, features, previousQuarter])
 
   const visibleFirms = selectedFirmIds.size > 0 ? firms.filter(f => selectedFirmIds.has(f.id)) : firms
   const columns = visibleFirms.map(f => ({ key: f.id, label: f.name }))
@@ -229,12 +246,18 @@ function CapabilityCategoryEditPageContent() {
               onToggle={firmToggler.toggle}
               onClear={firmToggler.clear}
             />
+            {previousQuarter && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                Changed since {previousQuarter.label}
+              </div>
+            )}
           </div>
 
           {loading ? (
             <div className="text-slate-400 text-sm">Loading...</div>
           ) : (
-            <EditableGrid sections={sections} columns={columns} onCellCommit={handleCommit} />
+            <EditableGrid sections={sections} columns={columns} onCellCommit={handleCommit} changedKeys={changedKeys} />
           )}
         </div>
       </div>

@@ -21,6 +21,7 @@ import { MultiSelectFilter, makeSetToggler } from '@/components/MultiSelectFilte
 import { TopNav } from '@/components/TopNav'
 import { downloadCsv } from '@/lib/csv'
 import { fetchAllRows } from '@/lib/fetchAll'
+import { computeChangedKeys } from '@/lib/diff'
 import { ArrowLeft, Pencil, Download } from 'lucide-react'
 
 export default function ProductCategoryPage() {
@@ -37,6 +38,9 @@ function ProductCategoryPageContent() {
   const quarterParam = searchParams.get('quarter')
   const { quarters } = useQuarters()
   const quarterId = quarterParam || quarters.find(q => q.is_current)?.id || quarters[0]?.id
+  // quarters come back most-recent-first, so the previous quarter is the next entry
+  const quarterIndex = quarters.findIndex(q => q.id === quarterId)
+  const previousQuarter = quarterIndex >= 0 && quarterIndex + 1 < quarters.length ? quarters[quarterIndex + 1] : null
 
   const [allCategories, setAllCategories] = useState<ProductCategory[]>([])
   const [category, setCategory] = useState<ProductCategory | null>(null)
@@ -45,6 +49,7 @@ function ProductCategoryPageContent() {
   const [products, setProducts] = useState<Product[]>([])
   const [firmsById, setFirmsById] = useState<Map<string, Firm>>(new Map())
   const [values, setValues] = useState<ProductValue[]>([])
+  const [previousValues, setPreviousValues] = useState<ProductValue[]>([])
   const [filter, setFilter] = useState('')
   const [selectedFirmIds, setSelectedFirmIds] = useState<Set<string>>(new Set())
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
@@ -97,23 +102,28 @@ function ProductCategoryPageContent() {
         setFeatures(feats || [])
 
         if (feats && feats.length > 0 && quarterId) {
-          const vals = await fetchAllRows<ProductValue>((from, to) =>
-            supabase
-              .from('product_values')
-              .select('*')
-              .in('feature_id', feats.map(f => f.id))
-              .eq('quarter_id', quarterId)
-              .range(from, to)
-          )
+          const featureIds = feats.map(f => f.id)
+          const [vals, prevVals] = await Promise.all([
+            fetchAllRows<ProductValue>((from, to) =>
+              supabase.from('product_values').select('*').in('feature_id', featureIds).eq('quarter_id', quarterId).range(from, to)
+            ),
+            previousQuarter
+              ? fetchAllRows<ProductValue>((from, to) =>
+                  supabase.from('product_values').select('*').in('feature_id', featureIds).eq('quarter_id', previousQuarter.id).range(from, to)
+                )
+              : Promise.resolve([]),
+          ])
           setValues(vals)
+          setPreviousValues(prevVals)
         } else {
           setValues([])
+          setPreviousValues([])
         }
       }
       setLoading(false)
     }
     load()
-  }, [category, quarterId])
+  }, [category, quarterId, previousQuarter?.id])
 
   const sections: PivotSection[] = useMemo(() => {
     const valuesByFeature = new Map<string, ProductValue[]>()
@@ -142,6 +152,12 @@ function ProductCategoryPageContent() {
       return { name: sub.name, rows }
     }).filter(s => s.rows.length > 0)
   }, [subcategories, features, values, filter])
+
+  const changedKeys = useMemo(() => {
+    if (!previousQuarter || previousValues.length === 0) return undefined
+    const featuresById = new Map(features.map(f => [f.id, f]))
+    return computeChangedKeys(values, previousValues, v => v.product_id, featuresById)
+  }, [values, previousValues, features, previousQuarter])
 
   const visibleProducts = products.filter(
     p =>
@@ -240,6 +256,12 @@ function ProductCategoryPageContent() {
                 onToggle={productToggler.toggle}
                 onClear={productToggler.clear}
               />
+              {previousQuarter && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  Changed since {previousQuarter.label}
+                </div>
+              )}
             </div>
             <button
               onClick={exportCsv}
@@ -253,7 +275,7 @@ function ProductCategoryPageContent() {
           {loading ? (
             <div className="text-slate-400 text-sm">Loading...</div>
           ) : (
-            <PivotTable sections={sections} columns={columns} />
+            <PivotTable sections={sections} columns={columns} changedKeys={changedKeys} />
           )}
         </div>
       </div>
