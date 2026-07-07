@@ -11,3 +11,16 @@ body {
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+
+/* Rendering for markdown coming back from the Ask panel (tables, bold, lists) */
+.prose-light p { margin-bottom: 0.6em; }
+.prose-light p:last-child { margin-bottom: 0; }
+.prose-light strong { color: #0f172a; font-weight: 600; }
+.prose-light ul, .prose-light ol { padding-left: 1.25em; margin-bottom: 0.6em; }
+.prose-light ul { list-style: disc; }
+.prose-light ol { list-style: decimal; }
+.prose-light li { margin-bottom: 0.15em; }
+.prose-light code { background: #f1f5f9; padding: 0.1em 0.35em; border-radius: 0.25em; font-size: 0.85em; }
+.prose-light table { border-collapse: collapse; margin-bottom: 0.75em; font-size: 0.9em; }
+.prose-light th, .prose-light td { border: 1px solid #e2e8f0; padding: 0.4em 0.6em; text-align: left; }
+.prose-light th { background: #f8fafc; font-weight: 600; }

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Sparkles, Loader2, RotateCcw } from 'lucide-react'
 
 const EXAMPLES = [
@@ -75,7 +77,9 @@ export function AskPanel() {
           {exchanges.map((ex, i) => (
             <div key={i}>
               <div className="text-sm font-medium text-slate-800 mb-1">{ex.question}</div>
-              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{ex.answer}</div>
+              <div className="prose-light text-sm text-slate-700 leading-relaxed overflow-x-auto">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{ex.answer}</ReactMarkdown>
+              </div>
             </div>
           ))}
         </div>
