@@ -96,6 +96,9 @@ PRODUCT_HEADER_MAP = {
     "Citizens Bank\nOne Deposit Checking": ("Citizens Bank", "One Deposit Checking"),
     "Citizens EverValue Checking": ("Citizens Bank", "EverValue Checking"),
     "Citizens Bank Quest Checking": ("Citizens Bank", "Quest Checking"),
+    # Present in Q4 2025 but discontinued/renamed by Q1 2026, so not in the original map:
+    "Chase\nSapphire Checking": ("Chase", "Sapphire Checking"),
+    "Discover\nCashback Debit": ("Discover", "Cashback Debit"),
     "Fifth Third\nExpress Checking": ("Fifth Third", "Express Checking"),
     "Fifth Third Momentum Checking": ("Fifth Third", "Momentum Checking"),
     "Fifth Third\nPreferred Checking": ("Fifth Third", "Preferred Checking"),
@@ -130,6 +133,7 @@ PRODUCT_HEADER_MAP = {
     "Citizens Bank Quest Savings": ("Citizens Bank", "Quest Savings"),
     "Citizens Bank\nPersonal Money Market": ("Citizens Bank", "Personal Money Market"),
     "Citizens Bank Quest Money Market": ("Citizens Bank", "Quest Money Market"),
+    "Discover\nOnline Savings": ("Discover", "Online Savings"),
     "Fifth Third\nMomentum Savings": ("Fifth Third", "Momentum Savings"),
     "Fifth Third\nRelationship Money Market": ("Fifth Third", "Relationship Money Market"),
     "PNC \nStandard Savings": ("PNC", "Standard Savings"),
@@ -160,11 +164,13 @@ PRODUCT_HEADER_MAP = {
     "Citi\nStep Up CD": ("Citi", "Step Up CD"),
     "Citi\nNo Penalty CD": ("Citi", "No Penalty CD"),
     "Citizens Bank\nCertificates of Deposit": ("Citizens Bank", "Certificates of Deposit"),
+    "Discover\nCertificates of Deposit": ("Discover", "Certificates of Deposit"),
     "Fifth Third \nStandard CD": ("Fifth Third", "Standard CD"),
     "Fifth Third \nFeatured CD": ("Fifth Third", "Featured CD"),
     "PNC \nFixed Rate CD": ("PNC", "Fixed Rate CD"),
     "TD Bank\nChoice Promotional CD": ("TD Bank", "Choice Promotional CD"),
     "TD Bank\nNo-Catch CD": ("TD Bank", "No-Catch CD"),
+    "TD Bank\nStep Rate CD": ("TD Bank", "Step Rate CD"),
     "Truist Certificates of Deposit": ("Truist", "Certificates of Deposit"),
     "U.S. Bank\nStandard CD": ("U.S. Bank", "Standard CD"),
     "U.S. Bank\nCD Special": ("U.S. Bank", "CD Special"),
@@ -348,7 +354,11 @@ def _parse_hierarchical_sheet(ws, sheet_name, first_data_col, last_col, last_row
         label = label_cell.value
         if label is None or str(label).strip() == "":
             continue
-        label = str(label).strip()
+        # Strip a trailing colon along with whitespace -- confirmed real-world case:
+        # Q4 2025's "Table Headers Include:" vs Q1/Q2 2026's "Table Headers Include"
+        # silently created a second, parallel subcategory (and 30 duplicate features)
+        # instead of merging into the existing one, since names are matched exactly.
+        label = str(label).strip().rstrip(':').strip()
         indent = int(label_cell.alignment.indent or 0) if label_cell.alignment else 0
 
         row_values_raw = [ws.cell(row=r, column=c).value for c in range(first_data_col, last_col + 1)]
@@ -437,15 +447,28 @@ def print_report(parsed: ParsedSheet):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--load", action="store_true", help="Load into Supabase (requires DATABASE_URL)")
+    ap = argparse.ArgumentParser(
+        description="Parse (and optionally load) a quarter's Bank Capabilities/Product Matrix files. "
+                     "Defaults to the original Q1 2026 files if no --capabilities-file/--product-file given."
+    )
+    ap.add_argument("--load", action="store_true", help="Load into Supabase (requires SUPABASE_URL/SUPABASE_KEY)")
+    ap.add_argument("--capabilities-file", default=CAPABILITIES_FILE, help="Path to the Bank Capabilities Matrix .xlsx")
+    ap.add_argument("--product-file", default=PRODUCT_FILE, help="Path to the Bank Product Matrix .xlsx")
+    ap.add_argument("--quarter-label", default=QUARTER_LABEL, help='e.g. "Q4 2025"')
+    ap.add_argument("--quarter-year", type=int, default=QUARTER_YEAR)
+    ap.add_argument("--quarter-number", type=int, default=QUARTER_NUMBER, choices=[1, 2, 3, 4])
+    ap.add_argument(
+        "--current", action="store_true",
+        help="Mark this quarter as the app's current quarter (unsets any other quarter's is_current). "
+             "Omit when backfilling a past quarter -- you don't want an old quarter to become 'current'."
+    )
     args = ap.parse_args()
 
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cap_path = os.path.join(base, CAPABILITIES_FILE)
-    prod_path = os.path.join(base, PRODUCT_FILE)
+    cap_path = args.capabilities_file if os.path.isabs(args.capabilities_file) else os.path.join(base, args.capabilities_file)
+    prod_path = args.product_file if os.path.isabs(args.product_file) else os.path.join(base, args.product_file)
 
-    print("Loading workbooks (this can take a little while for the 13MB capabilities file)...")
+    print(f"Loading workbooks for {args.quarter_label} (this can take a little while for a large capabilities file)...")
     cap_wb = openpyxl.load_workbook(cap_path, data_only=True)
     prod_wb = openpyxl.load_workbook(prod_path, data_only=True)
 
@@ -467,9 +490,15 @@ def main():
 
     if args.load:
         from load_into_supabase import load_all
-        load_all(cap_parsed, prod_parsed)
+        load_all(
+            cap_parsed, prod_parsed,
+            quarter_label=args.quarter_label,
+            quarter_year=args.quarter_year,
+            quarter_number=args.quarter_number,
+            is_current=args.current,
+        )
     else:
-        print("\nDry run complete. Re-run with --load (and DATABASE_URL set) to write to Supabase.")
+        print(f"\nDry run complete. Re-run with --load (and SUPABASE_URL/SUPABASE_KEY set) to write '{args.quarter_label}' to Supabase.")
 
 
 if __name__ == "__main__":

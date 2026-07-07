@@ -25,7 +25,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlencode
 
-from import_matrices import FIRM_NAMES, QUARTER_LABEL, QUARTER_YEAR, QUARTER_NUMBER
+from import_matrices import FIRM_NAMES
 
 BATCH_SIZE = 500
 
@@ -83,11 +83,56 @@ class RestClient:
                 prefer="resolution=merge-duplicates",
             )
 
+    def upsert_feature(self, table, subcategory_id, parent_feature_id, name, value_type, display_order):
+        """
+        capability_features/product_features can't use PostgREST's on_conflict
+        upsert for their natural key: (subcategory_id, parent_feature_id, name)
+        is a plain UNIQUE constraint, but SQL's NULL-distinctness means it never
+        actually flags a conflict for root-level features (parent_feature_id
+        IS NULL) -- so the insert proceeds and then fails against the *separate*
+        partial index (capability_features_root_unique) that exists specifically
+        to catch that case, which on_conflict wasn't told to target. PostgREST's
+        on_conflict has no way to target a partial index's predicate. Sidestep
+        the whole issue with a manual select-then-insert-or-update instead.
+        """
+        params = {
+            "subcategory_id": f"eq.{subcategory_id}",
+            "name": f"eq.{name}",
+            "select": "id",
+            "limit": "1",
+        }
+        params["parent_feature_id"] = "is.null" if parent_feature_id is None else f"eq.{parent_feature_id}"
+        existing = self.request("GET", table, params=params)
+        if existing:
+            feature_id = existing[0]["id"]
+            self.request(
+                "PATCH", table,
+                params={"id": f"eq.{feature_id}"},
+                json_body={"value_type": value_type, "display_order": display_order},
+            )
+            return feature_id
+        result = self.request(
+            "POST", table,
+            params={"select": "id"},
+            json_body={
+                "subcategory_id": subcategory_id,
+                "parent_feature_id": parent_feature_id,
+                "name": name,
+                "value_type": value_type,
+                "display_order": display_order,
+            },
+            prefer="return=representation",
+        )
+        return result[0]["id"]
 
-def upsert_quarter(client):
+
+def upsert_quarter(client, quarter_label, quarter_year, quarter_number, is_current):
+    # NOTE: does not clear is_current on other quarters even when is_current=True --
+    # the caller (import_matrices.py) is responsible for that, since it's the one
+    # that knows whether "make this current" was actually requested.
     return client.upsert_one(
         "quarters",
-        {"label": QUARTER_LABEL, "year": QUARTER_YEAR, "quarter_number": QUARTER_NUMBER, "is_current": True},
+        {"label": quarter_label, "year": quarter_year, "quarter_number": quarter_number, "is_current": is_current},
         on_conflict="label",
     )
 
@@ -117,16 +162,9 @@ def load_capability_sheet(client, parsed, category_order, quarter_id, firm_ids):
     value_rows = []
     for order, feature in enumerate(parsed.features):
         parent_id = feature.parent.db_id if feature.parent else None
-        feature.db_id = client.upsert_one(
-            "capability_features",
-            {
-                "subcategory_id": subcat_ids[feature.subcategory_name],
-                "parent_feature_id": parent_id,
-                "name": feature.name,
-                "value_type": feature.value_type,
-                "display_order": order,
-            },
-            on_conflict="subcategory_id,parent_feature_id,name",
+        feature.db_id = client.upsert_feature(
+            "capability_features", subcat_ids[feature.subcategory_name], parent_id,
+            feature.name, feature.value_type, order,
         )
 
         for firm_name, pv in feature.values.items():
@@ -180,16 +218,9 @@ def load_product_sheet(client, parsed, category_order, quarter_id, firm_ids):
     value_rows = []
     for order, feature in enumerate(parsed.features):
         parent_id = feature.parent.db_id if feature.parent else None
-        feature.db_id = client.upsert_one(
-            "product_features",
-            {
-                "subcategory_id": subcat_ids[feature.subcategory_name],
-                "parent_feature_id": parent_id,
-                "name": feature.name,
-                "value_type": feature.value_type,
-                "display_order": order,
-            },
-            on_conflict="subcategory_id,parent_feature_id,name",
+        feature.db_id = client.upsert_feature(
+            "product_features", subcat_ids[feature.subcategory_name], parent_id,
+            feature.name, feature.value_type, order,
         )
 
         for key, pv in feature.values.items():
@@ -211,11 +242,17 @@ def load_product_sheet(client, parsed, category_order, quarter_id, firm_ids):
     return len(value_rows)
 
 
-def load_all(cap_parsed, prod_parsed):
+def load_all(cap_parsed, prod_parsed, quarter_label, quarter_year, quarter_number, is_current=False):
     base_url, api_key = get_config()
     client = RestClient(base_url, api_key)
 
-    quarter_id = upsert_quarter(client)
+    if is_current:
+        # Only one quarter should be "current" -- unset the others first so the
+        # newly-loaded quarter (often a backfilled historical one) doesn't
+        # accidentally leave two quarters marked current.
+        client.request("PATCH", "quarters", params={"is_current": "eq.true"}, json_body={"is_current": False})
+
+    quarter_id = upsert_quarter(client, quarter_label, quarter_year, quarter_number, is_current)
     firm_ids = upsert_firms(client)
     print(f"  quarter + {len(firm_ids)} firms upserted")
 
@@ -230,4 +267,4 @@ def load_all(cap_parsed, prod_parsed):
         total_values += n
         print(f"  loaded {parsed.category_name}: {n} values")
 
-    print(f"\nDone. {total_values} total values loaded for {QUARTER_LABEL}.")
+    print(f"\nDone. {total_values} total values loaded for {quarter_label}.")
