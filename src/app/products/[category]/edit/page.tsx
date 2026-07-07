@@ -18,6 +18,7 @@ import { EditableGrid, EditableSection } from '@/components/EditableGrid'
 import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { CategoryNav } from '@/components/CategoryNav'
 import { MultiSelectFilter, makeSetToggler } from '@/components/MultiSelectFilter'
+import { fetchAllRows } from '@/lib/fetchAll'
 import { ArrowLeft, Eye } from 'lucide-react'
 
 export default function ProductCategoryEditPage() {
@@ -93,12 +94,15 @@ function ProductCategoryEditPageContent() {
         setFeatures(feats || [])
 
         if (feats && feats.length > 0 && quarterId) {
-          const { data: vals } = await supabase
-            .from('product_values')
-            .select('*')
-            .in('feature_id', feats.map(f => f.id))
-            .eq('quarter_id', quarterId)
-          setValues(vals || [])
+          const vals = await fetchAllRows<ProductValue>((from, to) =>
+            supabase
+              .from('product_values')
+              .select('*')
+              .in('feature_id', feats.map(f => f.id))
+              .eq('quarter_id', quarterId)
+              .range(from, to)
+          )
+          setValues(vals)
         } else {
           setValues([])
         }

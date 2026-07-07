@@ -17,6 +17,7 @@ import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { BarList } from '@/components/BarList'
 import { StackedBarList } from '@/components/StackedBarList'
 import { AskPanel } from '@/components/AskPanel'
+import { fetchAllRows } from '@/lib/fetchAll'
 import { ArrowLeft } from 'lucide-react'
 
 const MIN_SAMPLE_SIZE = 5 // ignore features too few firms have data on -- avoids noisy 100%/0% from tiny samples
@@ -69,12 +70,15 @@ function DashboardContent() {
 
       const featureIds = (featRes.data || []).map(f => f.id)
       if (featureIds.length > 0) {
-        const { data: vals } = await supabase
-          .from('capability_values')
-          .select('*')
-          .in('feature_id', featureIds)
-          .eq('quarter_id', quarterId)
-        setValues(vals || [])
+        const vals = await fetchAllRows<CapabilityValue>((from, to) =>
+          supabase
+            .from('capability_values')
+            .select('*')
+            .in('feature_id', featureIds)
+            .eq('quarter_id', quarterId)
+            .range(from, to)
+        )
+        setValues(vals)
       } else {
         setValues([])
       }

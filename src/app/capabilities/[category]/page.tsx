@@ -18,6 +18,7 @@ import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { CategoryNav } from '@/components/CategoryNav'
 import { MultiSelectFilter, makeSetToggler } from '@/components/MultiSelectFilter'
 import { downloadCsv } from '@/lib/csv'
+import { fetchAllRows } from '@/lib/fetchAll'
 import { ArrowLeft, Pencil, Download } from 'lucide-react'
 
 export default function CapabilityCategoryPage() {
@@ -85,12 +86,15 @@ function CapabilityCategoryPageContent() {
         setFeatures(feats || [])
 
         if (feats && feats.length > 0 && quarterId) {
-          const { data: vals } = await supabase
-            .from('capability_values')
-            .select('*')
-            .in('feature_id', feats.map(f => f.id))
-            .eq('quarter_id', quarterId)
-          setValues(vals || [])
+          const vals = await fetchAllRows<CapabilityValue>((from, to) =>
+            supabase
+              .from('capability_values')
+              .select('*')
+              .in('feature_id', feats.map(f => f.id))
+              .eq('quarter_id', quarterId)
+              .range(from, to)
+          )
+          setValues(vals)
         } else {
           setValues([])
         }
