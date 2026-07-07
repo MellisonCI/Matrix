@@ -17,6 +17,7 @@ import { PivotTable, PivotSection } from '@/components/PivotTable'
 import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { CategoryNav } from '@/components/CategoryNav'
 import { MultiSelectFilter, makeSetToggler } from '@/components/MultiSelectFilter'
+import { TopNav } from '@/components/TopNav'
 import { downloadCsv } from '@/lib/csv'
 import { fetchAllRows } from '@/lib/fetchAll'
 import { ArrowLeft, Pencil, Download } from 'lucide-react'
@@ -197,6 +198,7 @@ function CapabilityCategoryPageContent() {
           </div>
           <div className="flex items-center gap-3">
             <QuarterPicker quarterId={quarterId || null} />
+            <TopNav active="capabilities" quarterId={quarterId} />
             <Link
               href={`/capabilities/${categorySlug}/edit${quarterId ? `?quarter=${quarterId}` : ''}`}
               className="flex items-center gap-2 px-3 py-2 text-sm bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors"

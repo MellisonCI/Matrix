@@ -18,6 +18,7 @@ import { EditableGrid, EditableSection } from '@/components/EditableGrid'
 import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { CategoryNav } from '@/components/CategoryNav'
 import { MultiSelectFilter, makeSetToggler } from '@/components/MultiSelectFilter'
+import { TopNav } from '@/components/TopNav'
 import { fetchAllRows } from '@/lib/fetchAll'
 import { ArrowLeft, Eye } from 'lucide-react'
 
@@ -190,6 +191,7 @@ function ProductCategoryEditPageContent() {
           </div>
           <div className="flex items-center gap-3">
             <QuarterPicker quarterId={quarterId || null} />
+            <TopNav active="products" quarterId={quarterId} />
             <Link
               href={`/products/${categorySlug}${quarterId ? `?quarter=${quarterId}` : ''}`}
               className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 rounded-lg transition-colors"

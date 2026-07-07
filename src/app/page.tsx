@@ -17,9 +17,8 @@ import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { BarList } from '@/components/BarList'
 import { StackedBarList } from '@/components/StackedBarList'
 import { AskPanel } from '@/components/AskPanel'
+import { TopNav } from '@/components/TopNav'
 import { fetchAllRows } from '@/lib/fetchAll'
-import { slugify } from '@/lib/slug'
-import { Grid3x3, Package, Settings } from 'lucide-react'
 
 const MIN_SAMPLE_SIZE = 5 // ignore features too few firms have data on -- avoids noisy 100%/0% from tiny samples
 
@@ -40,7 +39,6 @@ function HomePageContent() {
   const quarterParam = searchParams.get('quarter')
   const { quarters } = useQuarters()
   const quarterId = quarterParam || quarters.find(q => q.is_current)?.id || quarters[0]?.id
-  const qs = quarterId ? `?quarter=${quarterId}` : ''
 
   const [firms, setFirms] = useState<Firm[]>([])
   const [categories, setCategories] = useState<CapabilityCategory[]>([])
@@ -205,9 +203,6 @@ function HomePageContent() {
 
   const productLegend = productCategories.map(c => ({ label: c.name, color: productCategoryColors.get(c.id) || '#94a3b8' }))
 
-  const defaultCapSlug = categories[0] ? slugify(categories[0].name) : null
-  const defaultProdSlug = productCategories[0] ? slugify(productCategories[0].name) : null
-
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10">
@@ -218,31 +213,7 @@ function HomePageContent() {
           </div>
           <div className="flex items-center gap-3">
             <QuarterPicker quarterId={quarterId || null} />
-            {defaultCapSlug && (
-              <Link
-                href={`/capabilities/${defaultCapSlug}${qs}`}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 rounded-lg transition-colors"
-              >
-                <Grid3x3 size={14} />
-                Capabilities
-              </Link>
-            )}
-            {defaultProdSlug && (
-              <Link
-                href={`/products/${defaultProdSlug}${qs}`}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 rounded-lg transition-colors"
-              >
-                <Package size={14} />
-                Products
-              </Link>
-            )}
-            <Link
-              href="/manage/firms"
-              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 rounded-lg transition-colors"
-            >
-              <Settings size={14} />
-              Manage
-            </Link>
+            <TopNav active="dashboard" quarterId={quarterId} />
           </div>
         </div>
       </div>
