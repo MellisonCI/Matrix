@@ -14,6 +14,7 @@ import {
 } from '@/lib/supabase'
 import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { BarList } from '@/components/BarList'
+import { AskPanel } from '@/components/AskPanel'
 import { ArrowLeft } from 'lucide-react'
 
 const MIN_SAMPLE_SIZE = 5 // ignore features too few firms have data on -- avoids noisy 100%/0% from tiny samples
@@ -191,6 +192,8 @@ function DashboardContent() {
           <div className="text-slate-400 text-sm">Loading...</div>
         ) : (
           <>
+            <AskPanel />
+
             <div className="grid grid-cols-4 gap-3 mb-8">
               <StatCard label="Firms" value={firms.length} />
               <StatCard label="Capability Features" value={booleanFeatures.length} />

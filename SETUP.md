@@ -79,10 +79,11 @@ git push -u origin main
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
 | `APP_PASSWORD` | A password you choose to protect the app |
+| `ANTHROPIC_API_KEY` | From [console.anthropic.com](https://console.anthropic.com) — powers the "Ask a question" feature on the dashboard |
 
-4. Click **Deploy**
-5. Vercel's build log is the first real compile/typecheck this code will go
-   through — if anything fails, send me the error and I'll fix it.
+4. Confirm **Framework Preset** says **Next.js** (Vercel usually detects this automatically, but if it ever shows "Other," switch it manually — Next.js apps deployed under the wrong preset fail with a "No Output Directory" error).
+5. Click **Deploy**.
+6. Check **Project Settings → Deployment Protection** and make sure "Vercel Authentication" isn't blocking Production — this app already has its own password gate (`APP_PASSWORD`), so a second Vercel-level login wall in front of it would stop anyone without a Vercel account on this team from reaching the app at all.
 
 ---
 
@@ -98,10 +99,15 @@ git push -u origin main
 - **Manage** (top right of home page): add/rename/reorder firms, create new
   quarters and mark one "current," and edit the category/subcategory/feature
   definitions themselves (including adding brand-new features going forward).
+- **Dashboard** (top right of home page): coverage/adoption charts, and an
+  "Ask a question" box that answers plain-language questions about the data
+  (e.g. "which firms don't offer live chat?") by looking up real values —
+  requires `ANTHROPIC_API_KEY` to be set.
 
-To start a new quarter: **Manage → Quarters → Add Quarter**, mark it current, then
-use the Edit views to fill in that quarter's data (existing feature/firm/product
-definitions carry over automatically — you're only entering values).
+To start a new quarter: **Manage → Quarters → Add Quarter**. It automatically
+copies every value forward from the current quarter (tagged "Carried over" so
+you can tell what's unreviewed) — edit only what actually changed, then mark
+the new quarter current when it's ready.
 
 ---
 
