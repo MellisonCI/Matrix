@@ -18,6 +18,7 @@ import { BarList } from '@/components/BarList'
 import { StackedBarList } from '@/components/StackedBarList'
 import { AskPanel } from '@/components/AskPanel'
 import { TopNav } from '@/components/TopNav'
+import { UpdatesThisQuarterPanel } from '@/components/UpdatesThisQuarterPanel'
 import { fetchAllRows } from '@/lib/fetchAll'
 
 const MIN_SAMPLE_SIZE = 5 // ignore features too few firms have data on -- avoids noisy 100%/0% from tiny samples
@@ -231,6 +232,8 @@ function HomePageContent() {
               <StatCard label="Products Tracked" value={products.length} />
               <StatCard label="Quarter" value={quarters.find(q => q.id === quarterId)?.label || '—'} />
             </div>
+
+            <UpdatesThisQuarterPanel quarterId={quarterId} quarters={quarters} />
 
             <div className="grid grid-cols-2 gap-6 mb-6">
               <Panel title="Firm Capability Coverage" subtitle="% of applicable capabilities present, all categories combined">
