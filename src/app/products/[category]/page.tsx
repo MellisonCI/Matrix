@@ -50,6 +50,15 @@ function ProductCategoryPageContent() {
   const firmToggler = makeSetToggler(selectedFirmIds, setSelectedFirmIds)
   const productToggler = makeSetToggler(selectedProductIds, setSelectedProductIds)
 
+  // Narrowing the firm filter can hide a product that was individually selected --
+  // drop it so the product filter never holds an invisible, stale selection.
+  useEffect(() => {
+    if (selectedFirmIds.size === 0 || selectedProductIds.size === 0) return
+    const stillValid = products.filter(p => selectedFirmIds.has(p.firm_id) && selectedProductIds.has(p.id)).map(p => p.id)
+    if (stillValid.length !== selectedProductIds.size) setSelectedProductIds(new Set(stillValid))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [[...selectedFirmIds].sort().join(',')])
+
   useEffect(() => {
     supabase.from('product_categories').select('*').order('display_order').then(({ data }) => {
       setAllCategories(data || [])
@@ -144,6 +153,7 @@ function ProductCategoryPageContent() {
     .sort((a, b) => a.display_order - b.display_order)
     .map(f => ({ key: f.id, label: f.name }))
   const productOptions = products
+    .filter(p => selectedFirmIds.size === 0 || selectedFirmIds.has(p.firm_id))
     .map(p => ({ key: p.id, label: p.name, sublabel: firmsById.get(p.firm_id)?.name }))
 
   function exportCsv() {

@@ -37,6 +37,9 @@ function CapabilityCategoryPageContent() {
 
   const [allCategories, setAllCategories] = useState<CapabilityCategory[]>([])
   const [category, setCategory] = useState<CapabilityCategory | null>(null)
+  // The checkboxes in the sidebar let more than one category be viewed together;
+  // navigating to a new category (clicking its name) resets this back to just that one.
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set())
   const [subcategories, setSubcategories] = useState<CapabilitySubcategory[]>([])
   const [features, setFeatures] = useState<CapabilityFeature[]>([])
   const [firms, setFirms] = useState<Firm[]>([])
@@ -45,6 +48,7 @@ function CapabilityCategoryPageContent() {
   const [selectedFirmIds, setSelectedFirmIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const firmToggler = makeSetToggler(selectedFirmIds, setSelectedFirmIds)
+  const categoryToggler = makeSetToggler(selectedCategoryIds, setSelectedCategoryIds)
 
   useEffect(() => {
     supabase.from('capability_categories').select('*').order('display_order').then(({ data }) => {
@@ -56,14 +60,16 @@ function CapabilityCategoryPageContent() {
     if (allCategories.length === 0) return
     const cat = allCategories.find(c => slugify(c.name) === categorySlug)
     setCategory(cat || null)
+    if (cat) setSelectedCategoryIds(new Set([cat.id]))
   }, [allCategories, categorySlug])
 
   useEffect(() => {
-    if (!category) return
+    if (selectedCategoryIds.size === 0) return
     setLoading(true)
     async function load() {
+      const categoryIds = [...selectedCategoryIds]
       const [subRes, firmRes] = await Promise.all([
-        supabase.from('capability_subcategories').select('*').eq('category_id', category!.id).order('display_order'),
+        supabase.from('capability_subcategories').select('*').in('category_id', categoryIds).order('display_order'),
         supabase.from('firms').select('*').order('display_order'),
       ])
       const subs = subRes.data || []
@@ -88,11 +94,27 @@ function CapabilityCategoryPageContent() {
         } else {
           setValues([])
         }
+      } else {
+        setFeatures([])
+        setValues([])
       }
       setLoading(false)
     }
     load()
-  }, [category, quarterId])
+    // Stringify the set so this only re-runs when the actual selection changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [[...selectedCategoryIds].sort().join(','), quarterId])
+
+  const categoryNameBySubcategory = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const sub of subcategories) {
+      const cat = allCategories.find(c => c.id === sub.category_id)
+      if (cat) m.set(sub.id, cat.name)
+    }
+    return m
+  }, [subcategories, allCategories])
+
+  const showCategoryPrefix = selectedCategoryIds.size > 1
 
   const sections: PivotSection[] = useMemo(() => {
     const valuesByFeature = new Map<string, CapabilityValue[]>()
@@ -118,12 +140,18 @@ function CapabilityCategoryPageContent() {
             values: valueMap,
           }
         })
-      return { name: sub.name, rows }
+      const categoryName = categoryNameBySubcategory.get(sub.id)
+      const name = showCategoryPrefix && categoryName ? `${categoryName} · ${sub.name}` : sub.name
+      return { name, rows }
     }).filter(s => s.rows.length > 0)
-  }, [subcategories, features, values, filter])
+  }, [subcategories, features, values, filter, categoryNameBySubcategory, showCategoryPrefix])
 
   const visibleFirms = selectedFirmIds.size > 0 ? firms.filter(f => selectedFirmIds.has(f.id)) : firms
   const columns = visibleFirms.map(f => ({ key: f.id, label: f.name }))
+
+  const selectedCategoryNames = allCategories.filter(c => selectedCategoryIds.has(c.id)).map(c => c.name)
+  const headerTitle =
+    selectedCategoryNames.length <= 1 ? category?.name || '...' : `${selectedCategoryNames.length} categories`
 
   function exportCsv() {
     const headers = ['Feature', 'Adoption', ...columns.map(c => c.label)]
@@ -145,7 +173,7 @@ function CapabilityCategoryPageContent() {
         ])
       }
     }
-    downloadCsv(`${category?.name || 'capabilities'}.csv`, headers, rows)
+    downloadCsv(`${selectedCategoryNames.join('-') || 'capabilities'}.csv`, headers, rows)
   }
 
   return (
@@ -158,7 +186,9 @@ function CapabilityCategoryPageContent() {
             </Link>
             <div>
               <div className="text-xs font-mono tracking-[0.25em] text-slate-400 uppercase">Capabilities Matrix</div>
-              <h1 className="text-lg font-light text-slate-900 tracking-tight">{category?.name || '...'}</h1>
+              <h1 className="text-lg font-light text-slate-900 tracking-tight" title={selectedCategoryNames.join(', ')}>
+                {headerTitle}
+              </h1>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -176,7 +206,15 @@ function CapabilityCategoryPageContent() {
 
       <div className="w-full px-6 py-6 flex gap-6">
         <aside className="w-56 flex-shrink-0">
-          <CategoryNav basePath="/capabilities" categories={allCategories} activeSlug={categorySlug} mode="view" />
+          <CategoryNav
+            basePath="/capabilities"
+            categories={allCategories}
+            activeSlug={categorySlug}
+            mode="view"
+            selectedIds={selectedCategoryIds}
+            onToggleSelect={categoryToggler.toggle}
+          />
+          <p className="text-[11px] text-slate-400 mt-2 px-1">Check a category to add it to the view below.</p>
         </aside>
 
         <div className="flex-1 min-w-0">

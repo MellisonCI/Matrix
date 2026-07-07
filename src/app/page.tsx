@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { supabase, CapabilityCategory, ProductCategory } from '@/lib/supabase'
 import { QuarterPicker } from '@/components/QuarterPicker'
 import { slugify } from '@/lib/slug'
-import { Settings, LayoutDashboard, Layers } from 'lucide-react'
+import { Settings, LayoutDashboard } from 'lucide-react'
 
 export default function HomePage() {
   return (
@@ -45,13 +45,6 @@ function HomePageContent() {
           </div>
           <div className="flex items-center gap-3">
             <QuarterPicker quarterId={quarter} />
-            <Link
-              href={`/capabilities/compare${qs}`}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 rounded-lg transition-colors"
-            >
-              <Layers size={14} />
-              Compare Categories
-            </Link>
             <Link
               href={`/dashboard${qs}`}
               className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 rounded-lg transition-colors"
