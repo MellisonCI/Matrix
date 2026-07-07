@@ -16,6 +16,7 @@ import { buildFeatureTree, flattenTree } from '@/lib/matrix'
 import { PivotTable, PivotSection } from '@/components/PivotTable'
 import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { CategoryNav } from '@/components/CategoryNav'
+import { MultiSelectFilter, makeSetToggler } from '@/components/MultiSelectFilter'
 import { downloadCsv } from '@/lib/csv'
 import { ArrowLeft, Pencil, Download } from 'lucide-react'
 
@@ -41,7 +42,9 @@ function CapabilityCategoryPageContent() {
   const [firms, setFirms] = useState<Firm[]>([])
   const [values, setValues] = useState<CapabilityValue[]>([])
   const [filter, setFilter] = useState('')
+  const [selectedFirmIds, setSelectedFirmIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const firmToggler = makeSetToggler(selectedFirmIds, setSelectedFirmIds)
 
   useEffect(() => {
     supabase.from('capability_categories').select('*').order('display_order').then(({ data }) => {
@@ -119,7 +122,8 @@ function CapabilityCategoryPageContent() {
     }).filter(s => s.rows.length > 0)
   }, [subcategories, features, values, filter])
 
-  const columns = firms.map(f => ({ key: f.id, label: f.name }))
+  const visibleFirms = selectedFirmIds.size > 0 ? firms.filter(f => selectedFirmIds.has(f.id)) : firms
+  const columns = visibleFirms.map(f => ({ key: f.id, label: f.name }))
 
   function exportCsv() {
     const headers = ['Feature', 'Adoption', ...columns.map(c => c.label)]
@@ -176,14 +180,23 @@ function CapabilityCategoryPageContent() {
         </aside>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-3">
-            <input
-              type="text"
-              placeholder="Filter features..."
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
-              className="bg-white border border-slate-300 text-slate-900 px-3 py-2 rounded-lg text-sm w-64 focus:outline-none focus:border-slate-400"
-            />
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Filter features..."
+                value={filter}
+                onChange={e => setFilter(e.target.value)}
+                className="bg-white border border-slate-300 text-slate-900 px-3 py-2 rounded-lg text-sm w-64 focus:outline-none focus:border-slate-400"
+              />
+              <MultiSelectFilter
+                label="Firms"
+                options={firms.map(f => ({ key: f.id, label: f.name }))}
+                selected={selectedFirmIds}
+                onToggle={firmToggler.toggle}
+                onClear={firmToggler.clear}
+              />
+            </div>
             <button
               onClick={exportCsv}
               className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 rounded-lg transition-colors"
