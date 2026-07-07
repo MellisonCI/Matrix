@@ -11,13 +11,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY is not configured on the server.' }, { status: 500 })
   }
 
-  const { question } = await req.json()
+  const { question, history } = await req.json()
   if (!question || typeof question !== 'string') {
     return NextResponse.json({ error: 'Missing question' }, { status: 400 })
   }
 
   const client = new Anthropic()
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: question }]
+  // The API is stateless -- the client resends the prior conversation (in
+  // Claude's own message format, tool calls and all) so follow-up questions
+  // like "yes, pull that comparison too" have the earlier turns as context.
+  const messages: Anthropic.MessageParam[] = Array.isArray(history) ? [...history] : []
+  messages.push({ role: 'user', content: question })
 
   try {
     for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
@@ -33,7 +37,8 @@ export async function POST(req: NextRequest) {
 
       if (response.stop_reason !== 'tool_use') {
         const text = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text || ''
-        return NextResponse.json({ answer: text })
+        messages.push({ role: 'assistant', content: response.content })
+        return NextResponse.json({ answer: text, history: messages })
       }
 
       messages.push({ role: 'assistant', content: response.content })
