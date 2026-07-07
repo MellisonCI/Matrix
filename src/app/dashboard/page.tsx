@@ -11,13 +11,19 @@ import {
   CapabilityFeature,
   CapabilityValue,
   Product,
+  ProductCategory,
 } from '@/lib/supabase'
 import { QuarterPicker, useQuarters } from '@/components/QuarterPicker'
 import { BarList } from '@/components/BarList'
+import { StackedBarList } from '@/components/StackedBarList'
 import { AskPanel } from '@/components/AskPanel'
 import { ArrowLeft } from 'lucide-react'
 
 const MIN_SAMPLE_SIZE = 5 // ignore features too few firms have data on -- avoids noisy 100%/0% from tiny samples
+
+// Fixed palette by category position so colors stay stable even if a category is renamed,
+// and cycles gracefully if more product categories are added later.
+const CATEGORY_COLORS = ['#0f172a', '#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6']
 
 export default function DashboardPage() {
   return (
@@ -39,24 +45,27 @@ function DashboardContent() {
   const [features, setFeatures] = useState<CapabilityFeature[]>([])
   const [values, setValues] = useState<CapabilityValue[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!quarterId) return
     setLoading(true)
     async function load() {
-      const [firmsRes, catRes, subcatRes, featRes, prodRes] = await Promise.all([
+      const [firmsRes, catRes, subcatRes, featRes, prodRes, prodCatRes] = await Promise.all([
         supabase.from('firms').select('*').order('display_order'),
         supabase.from('capability_categories').select('*').order('display_order'),
         supabase.from('capability_subcategories').select('*'),
         supabase.from('capability_features').select('*'),
         supabase.from('products').select('*'),
+        supabase.from('product_categories').select('*').order('display_order'),
       ])
       setFirms(firmsRes.data || [])
       setCategories(catRes.data || [])
       setSubcategories(subcatRes.data || [])
       setFeatures(featRes.data || [])
       setProducts(prodRes.data || [])
+      setProductCategories(prodCatRes.data || [])
 
       const featureIds = (featRes.data || []).map(f => f.id)
       if (featureIds.length > 0) {
@@ -162,13 +171,33 @@ function DashboardContent() {
       .sort((a, b) => b.value - a.value)
   }, [categories, featureAdoption])
 
-  const productCounts = useMemo(
+  const productCategoryColors = useMemo(() => {
+    const m = new Map<string, string>()
+    productCategories.forEach((c, i) => m.set(c.id, CATEGORY_COLORS[i % CATEGORY_COLORS.length]))
+    return m
+  }, [productCategories])
+
+  const productCountsByCategory = useMemo(
     () =>
       firms
-        .map(firm => ({ label: firm.name, value: products.filter(p => p.firm_id === firm.id).length }))
-        .sort((a, b) => b.value - a.value),
-    [firms, products]
+        .map(firm => {
+          const firmProducts = products.filter(p => p.firm_id === firm.id)
+          const segments = productCategories.map(cat => ({
+            key: cat.id,
+            label: cat.name,
+            value: firmProducts.filter(p => p.category_id === cat.id).length,
+            color: productCategoryColors.get(cat.id) || '#94a3b8',
+          }))
+          return { label: firm.name, segments }
+        })
+        .sort(
+          (a, b) =>
+            b.segments.reduce((s, seg) => s + seg.value, 0) - a.segments.reduce((s, seg) => s + seg.value, 0)
+        ),
+    [firms, products, productCategories, productCategoryColors]
   )
+
+  const productLegend = productCategories.map(c => ({ label: c.name, color: productCategoryColors.get(c.id) || '#94a3b8' }))
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -219,8 +248,8 @@ function DashboardContent() {
               </Panel>
             </div>
 
-            <Panel title="Products by Firm" subtitle="Total tracked products (checking, savings, CD) per firm">
-              <BarList items={productCounts} />
+            <Panel title="Products by Firm" subtitle="Total tracked products per firm, colored by product category">
+              <StackedBarList items={productCountsByCategory} legend={productLegend} />
             </Panel>
           </>
         )}
